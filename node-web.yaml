@@ -146,6 +146,14 @@ parameters:
     type: string
     default: ''
 
+  rc_network_name:
+    type: string
+    label: RackConnect Network
+    description: Name or UUID of RackConnected network to attach this server to
+    constraints:
+    - custom_constraint: rackconnect.network
+    immutable: true
+
 
 resources:
 
