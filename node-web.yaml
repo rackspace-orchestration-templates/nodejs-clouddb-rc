@@ -91,7 +91,7 @@ parameters:
 
   child_template:
     type: string
-    default: https://raw.githubusercontent.com/rackspace-orchestration-templates/nodejs-clouddb/master/node-web.yaml
+    default: https://raw.githubusercontent.com/rackspace-orchestration-templates/nodejs-clouddb-rc/master/node-web.yaml
 
   revision:
     label: Revision
@@ -175,7 +175,12 @@ resources:
       - network: 11111111-1111-1111-1111-111111111111
       metadata:
         rax-heat: { get_param: stack_id }
-
+  nodestack_node_public_ip:
+    type: Rackspace::RackConnect::PublicIP
+    depends_on:
+    - nodestack_node
+    properties:
+      server_id: { get_resource: nodestack_node }
   nodestack_chef_run:
     type: 'OS::Heat::ChefSolo'
     depends_on: nodestack_node
@@ -222,7 +227,8 @@ outputs:
   accessIPv4:
     description: Node.js node public IP
     value: { get_attr: [nodestack_node, accessIPv4] }
-
+  rc_network:
+    value: { get_attr: [nodestack_node, networks, { get_param: rc_network_name }, 0 ] }
   privateIPv4:
     description: NodeJS node prive IP
     value: { get_attr: [nodestack_node, networks, private, 0] }

@@ -392,7 +392,7 @@ resources:
 outputs:
   load_balancer_ip:
     description: Load Balancer IP
-    value: { get_attr: [load_balancer, PublicIp] }
+    value: { get_attr: [load_balancer, accessIPv4] }
 
   nodejs_url:
     description: "Node.js URL"
@@ -400,7 +400,7 @@ outputs:
       str_replace:
         template: "http://%ip%"
         params:
-          "%ip%": { get_attr: [load_balancer, PublicIp] }
+          "%ip%": { get_attr: [load_balancer, accessIPv4] }
 
   database_server_ip:
     description: Database Server hostname
