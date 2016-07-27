@@ -187,7 +187,7 @@ resources:
     properties:
       username: root
       private_key: { get_param: ssh_private_key }
-      host: { get_attr: [nodestack_node, accessIPv4] }
+      host: { get_attr: [nodestack_node, networks, private, 0] }
       kitchen: { get_param: kitchen }
       chef_version: { get_param: chef_version }
       node:
