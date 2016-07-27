@@ -2,8 +2,9 @@ schema-version: 1.0.0
 application-family: Application Frameworks
 application-name: Node.js
 application-version: 0.10.32
-flavor: Multiple Linux servers
+flavor: Multiple Linux servers - RCv3
 flavor-weight: 1
+rackconnect: true
 reach-info:
   tattoo: https://0b5294b243620310a700-e388a7f3aba385a925111b1fc6f680d4.ssl.cf2.rackcdn.com/nodejs-tattoo.png
   icon-20x20: https://0b5294b243620310a700-e388a7f3aba385a925111b1fc6f680d4.ssl.cf2.rackcdn.com/nodejs-icon-20x20.png
@@ -61,3 +62,5 @@ instructions: |
 description: |
   Multiple Linux servers with [Node.js 0.10.26](https://nodejs.org/) and a
   backend Cloud Database.
+
+  This template will not function without RCv3.
