@@ -1,0 +1,419 @@
+heat_template_version: 2013-05-23
+
+description: |
+  Multiple Linux servers with [Node.js 0.10.26](https://nodejs.org/) and a
+  backend Cloud Database.
+
+  This template will only function with RackConnect v3.
+parameter_groups:
+- label: Server Settings
+  parameters:
+  - image
+  - flavor
+
+- label: Node.js Application Settings
+  parameters:
+  - revision
+  - packages
+  - repo
+  - deploy_key
+- label: RackConnect Settings
+  parameters:
+  - rc_network_name
+- label: rax-dev-params
+  parameters:
+  - destination
+  - child_template
+  - load_balancer_hostname
+  - server_hostnames
+  - kitchen
+  - chef_version
+  - loadbalancer_flavor
+  - ansible_source
+
+parameters:
+  server_hostnames:
+    label: Server Name
+    description: Server Name
+    type: string
+    default: nodejs-%index%
+    constraints:
+    - length:
+        min: 1
+        max: 64
+    - allowed_pattern: "^[a-zA-Z][a-zA-Z0-9%-]*$"
+      description: |
+        Must begin with a letter and contain only alphanumeric characters.
+
+  database_username:
+    label: Database Username
+    description: Database Username
+    type: string
+    default: 'nodejs'
+
+  load_balancer_hostname:
+    label: Load Balancer Hostname
+    description: Hostname for the Cloud Load Balancer
+    type: string
+    default: nodejs-app-load-balancer
+    constraints:
+    - length:
+        min: 1
+        max: 64
+    - allowed_pattern: "^[a-zA-Z][a-zA-Z0-9-]*$"
+      description: |
+        Must begin with a letter and contain only alphanumeric characters.
+
+  nodejs_app_server_count:
+    label: Server Count
+    description: |
+      Required: Number of servers to spin up as a part of this deployment.
+    type: number
+    default: 2
+    constraints:
+    - range:
+        min: 1
+        max: 25
+      description: Must be between 1 and 25 servers.
+
+  image:
+    label: Operating System
+    description: |
+      Required: Server image used for all servers that are created as a part of
+      this deployment.
+    type: string
+    default: Ubuntu 12.04 LTS (Precise Pangolin) (PVHVM)
+    constraints:
+    - allowed_values:
+      - Ubuntu 12.04 LTS (Precise Pangolin) (PVHVM)
+      - Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+      description: Must be a supported operating system.
+
+  flavor:
+    label: Server Size
+    description: |
+      Required: Rackspace Cloud Server flavor to use. The size is based on the
+      amount of RAM for the provisioned server.
+    type: string
+    default: 4 GB General Purpose v1
+    constraints:
+    - allowed_values:
+      - 1 GB General Purpose v1
+      - 2 GB General Purpose v1
+      - 4 GB General Purpose v1
+      - 8 GB General Purpose v1
+      - 15 GB I/O v1
+      - 30 GB I/O v1
+      - 60 GB I/O v1
+      - 90 GB Performance
+      - 512MB Standard Instance
+      - 1GB Standard Instance
+      - 2GB Standard Instance
+      - 4GB Standard Instance
+      - 8GB Standard Instance
+      - 15GB Standard Instance
+      - 30GB Standard Instance
+      description: |
+        Must be a valid Rackspace Cloud Server flavor for the region you have
+        selected to deploy into.
+
+  db_flavor:
+    label: Cloud Database Size
+    description: |
+      Required: Rackspace Cloud Database Flavor. Size is based on amount of RAM
+      for the provisioned instance.
+    type: string
+    default: 1GB Instance
+    constraints:
+    - allowed_values:
+      - 512MB Instance
+      - 1GB Instance
+      - 2GB Instance
+      - 4GB Instance
+      - 8GB Instance
+      - 16GB Instance
+      description: |
+        Must be a valid Rackspace Cloud Database flavor for the region you have
+        selected to deploy into.
+
+  datastore_version:
+    label: MySQL Version
+    type: string
+    description: |
+      Required: Version of MySQL to run on the Cloud Databases instance.
+    default: "5.6"
+    constraints:
+    - allowed_values:
+      - "5.6"
+      - "5.1"
+
+  db_size:
+    label: Database Size
+    description: |
+      Required: Amount of storage required for your Rackspace Cloud Database,
+      in GB.
+    type: number
+    default: 10
+    constraints:
+    - range:
+        min: 10
+        max: 150
+    description: |
+        Database instance size, in GB. min 10, max 150
+
+  revision:
+    label: Revision
+    description: |
+      Optional: Git Branch/Ref to deploy. Default: HEAD
+    type: string
+    default: HEAD
+
+  packages:
+    label: System Packages
+    description: |
+      Optional: Additional system packages to install. For a list of available
+      packages, see: http://packages.ubuntu.com/precise/allpackages
+    type: string
+    default: ''
+
+  repo:
+    label: Git Repository
+    description: |
+      Optional: URL to your git repository. Use the https:// syntax for public
+      repositories, use git@ syntax for private repositories.
+    type: string
+    default: ''
+
+  deploy_key:
+    label: Git Deploy Key
+    description: |
+      Optional: If you specified a private repository, provide your private
+      deploy key here.
+    type: string
+    default: ''
+
+  destination:
+    label: Site Path
+    description: Path to setup your application on your servers.
+    default: /var/www/vhosts/application
+    type: string
+
+  kitchen:
+    label: Kitchen URL
+    description: URL for the kitchen to use
+    type: string
+    default: https://github.com/rackspace-orchestration-templates/nodejs-clouddb-rc
+
+  chef_version:
+    label: Chef Version
+    description: Version of chef client to use
+    type: string
+    default: 11.16.0
+
+  child_template:
+    label: Child Template
+    description: |
+      Location of the child template to use for the Node.js web servers
+    type: string
+    default: https://raw.githubusercontent.com/rackspace-orchestration-templates/nodejs-clouddb-rc/master/node-web.yaml
+
+  rc_network_name:
+    type: string
+    label: RackConnect Network
+    description: Name or UUID of RackConnected network to attach this server to
+    constraints:
+    - custom_constraint: rackconnect.network
+    immutable: true
+
+  loadbalancer_flavor:
+    type: string
+    default: 2 GB General Purpose v1
+    label: Server Flavor
+    description: Flavor of Cloud Server to use for Drupal
+    constraints:
+    - allowed_values:
+      - 2 GB General Purpose v1
+      - 4 GB General Purpose v1
+      - 8 GB General Purpose v1
+    immutable: true
+  ansible_source:
+    type: string
+    default: http://catalog.rs-heat.com/ansible-roles/ansible-roles.tar.gz
+    label: Ansible Tarball
+    description: The Ansible Roles will be pulled from the location provided
+    immutable: true
+resources:
+  ssh_key:
+    type: "OS::Nova::KeyPair"
+    properties:
+      name: { get_param: "OS::stack_id" }
+      save_private_key: true
+
+  upload_lb_role_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      outputs:
+      - name: results
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            set -e
+            mkdir -p /etc/ansible/roles
+            wget ansible_source -O /tmp/ansible-roles.tar.gz 2>&1
+            tar -xf /tmp/ansible-roles.tar.gz --strip-components=1 -C /etc/ansible/roles
+          params:
+            ansible_source: { get_param: ansible_source }
+  deploy_lb_roles:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      signal_transport: TEMP_URL_SIGNAL
+      config:
+        get_resource: upload_lb_role_config
+      server:
+        get_resource: load_balancer
+  deploy_loadbalancer:
+    type: OS::Heat::SoftwareDeployment
+    depends_on: deploy_lb_roles
+    properties:
+      signal_transport: TEMP_URL_SIGNAL
+      input_values:
+        nginx_vhost_str: { get_param: joomla_url }
+        nginx_vhost_template: "loadbalancer"
+        nginx_upstream_server: '0.0.0.0 down'
+        nginx_lb_nodes: { get_attr: [nodejs_app_servers, rc_network] }
+        firewall_global_rules: [ "0.0.0.0,0,22,tcp", "0.0.0.0,0,80,tcp", "0.0.0.0,0,443,tcp"]
+      config:
+        get_resource: loadbalancer_config
+      server:
+        get_resource: load_balancer
+  loadbalancer_config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: ansible
+      inputs:
+      - default: "[]"
+        name: nginx_lb_nodes
+        type: CommaDelimitedList
+      - default: "[]"
+        name: firewall_global_rules
+        type: CommaDelimitedList
+      config: |
+        ---
+        - name: Install and configure nginx as Load Balancer
+          hosts: localhost
+          connection: local
+          roles:
+          - nginx
+          - firewall
+  load_balancer:
+    type: OS::Nova::Server
+    properties:
+      name:
+        str_replace:
+          template: stack_Load_Balancer
+          params:
+            stack: { get_param: "OS::stack_name" }
+      image: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM) (Orchestration)
+      flavor: { get_param: loadbalancer_flavor }
+      key_name: { get_resource: ssh_key }
+      software_config_transport: POLL_TEMP_URL
+      config_drive: true
+      user_data_format: SOFTWARE_CONFIG
+      networks:
+      - network: { get_param: rc_network_name }
+      - network: 11111111-1111-1111-1111-111111111111
+      metadata:
+        rax-heat: { get_param: "OS::stack_id" }
+        build_config: "monitoring_agent_only"
+  load_balancer_public_ip:
+    type: Rackspace::RackConnect::PublicIP
+    depends_on:
+    - load_balancer
+    properties:
+      server_id: { get_resource: load_balancer }
+
+  database_user_password:
+    type: "OS::Heat::RandomString"
+    properties:
+      length: 16
+      sequence: lettersdigits
+
+  db_admin_password:
+    type: "OS::Heat::RandomString"
+    properties:
+      length: 16
+      sequence: lettersdigits
+
+  database_server:
+    type: OS::Trove::Instance
+    properties:
+      name:
+        str_replace:
+          template: "nodejs_app_db_%stackid%"
+          params:
+            "%stackid%": { get_param: "OS::stack_id" }
+      flavor: { get_param: db_flavor }
+      size: { get_param: db_size }
+      datastore_type: mysql
+      datastore_version: { get_param: datastore_version }
+      databases:
+      - name: nodejs_db
+      users:
+      - name: { get_param: database_username }
+        password: { get_resource: database_user_password }
+        databases: [ nodejs_db ]
+
+  nodejs_app_servers:
+    type: "OS::Heat::ResourceGroup"
+    depends_on: database_server
+    properties:
+      count: { get_param: nodejs_app_server_count }
+      resource_def:
+        type: { get_param: child_template }
+        properties:
+          flavor: { get_param: flavor }
+          hostname: { get_param: server_hostnames }
+          ssh_key_name: { get_resource: ssh_key }
+          ssh_private_key: { get_attr: [ssh_key, private_key] }
+          kitchen: { get_param: kitchen }
+          chef_version: { get_param: chef_version }
+          revision: { get_param: revision }
+          packages: { get_param: packages }
+          repo: { get_param: repo }
+          deploy_key: { get_param: deploy_key }
+          destination: { get_param: destination }
+          db_server_ip: { get_attr: [database_server, hostname] }
+          database_username: { get_param: database_username }
+          database_user_password: { get_resource: database_user_password }
+          rc_network_name: { get_param: rc_network_name }
+
+outputs:
+  load_balancer_ip:
+    description: Load Balancer IP
+    value: { get_attr: [load_balancer, PublicIp] }
+
+  nodejs_url:
+    description: "Node.js URL"
+    value:
+      str_replace:
+        template: "http://%ip%"
+        params:
+          "%ip%": { get_attr: [load_balancer, PublicIp] }
+
+  database_server_ip:
+    description: Database Server hostname
+    value: { get_attr: [database_server, hostname] }
+
+  mysql_root_password:
+    description: MySQL Root Password
+    value: { get_attr: [db_admin_password, value] }
+
+  node_server_ips:
+    description: Node.js Server IPs
+    value: { get_attr: [nodejs_app_servers, accessIPv4] }
+
+  private_key:
+    description: SSH Private Key
+    value: { get_attr: [ssh_key, private_key] }

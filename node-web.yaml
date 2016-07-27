@@ -1,0 +1,217 @@
+heat_template_version: 2013-05-23
+
+description: |
+  Heat template to deploy a single Node.js server
+
+parameters:
+  hostname:
+    label: Server Name
+    description: Server Name
+    type: string
+    default: nodejs
+    constraints:
+    - length:
+        min: 1
+        max: 64
+    - allowed_pattern: "^[a-zA-Z][a-zA-Z0-9-]*$"
+      description: |
+        Must begin with a letter and contain only alphanumeric characters.
+
+  server_count:
+    label: Server Count
+    description: |
+      Required: Number of servers to spin up as a part of this deployment.
+    type: number
+    default: 2
+    constraints:
+    - range:
+        min: 1
+        max: 25
+      description: Must be between 1 and 25 servers.
+
+  image:
+    label: Operating System
+    description: |
+      Required: Server image used for all servers that are created as a part of
+      this deployment.
+    type: string
+    default: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+    constraints:
+    - allowed_values:
+      - Ubuntu 12.04 LTS (Precise Pangolin) (PVHVM)
+      - Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+      description: Must be a supported operating system.
+
+  flavor:
+    label: Server Size
+    description: |
+      Required: Rackspace Cloud Server flavor to use. The size is based on the
+      amount of RAM for the provisioned server.
+    type: string
+    default: 4 GB General Purpose v1
+    constraints:
+    - allowed_values:
+      - 1 GB General Purpose v1
+      - 2 GB General Purpose v1
+      - 4 GB General Purpose v1
+      - 8 GB General Purpose v1
+      - 15 GB I/O v1
+      - 30 GB I/O v1
+      - 60 GB I/O v1
+      - 90 GB Performance
+      - 512MB Standard Instance
+      - 1GB Standard Instance
+      - 2GB Standard Instance
+      - 4GB Standard Instance
+      - 8GB Standard Instance
+      - 15GB Standard Instance
+      - 30GB Standard Instance
+      description: |
+        Must be a valid Rackspace Cloud Server flavor for the region you have
+        selected to deploy into.
+
+  ssh_key_name:
+    description: Nova keypair name for ssh access to the server
+    type: string
+
+  ssh_private_key:
+    description: Private SSH key
+    type: string
+    default: false
+
+  kitchen:
+    description: URL for the kitchen to use
+    type: string
+    default: https://github.com/rackspace-orchestration-templates/nodejs-clouddb
+
+  chef_version:
+    description: Version of chef client to use
+    type: string
+    default: 11.16.0
+
+  child_template:
+    type: string
+    default: https://raw.githubusercontent.com/rackspace-orchestration-templates/nodejs-clouddb/master/node-web.yaml
+
+  revision:
+    label: Revision
+    description: |
+      Optional: Git Branch/Ref to deploy. Default: HEAD
+    type: string
+    default: HEAD
+
+  packages:
+    label: System Packages
+    description: |
+      Optional: Additional system packages to install. For a list of available
+      packages, see: http://packages.ubuntu.com/precise/allpackages
+    type: string
+    default: ''
+
+  repo:
+    label: Git Repository
+    description: |
+      Optional: URL to your git repository. Use the https:// syntax for public
+      repositories, use git@ syntax for private repositories.
+    type: string
+    default: ''
+
+  deploy_key:
+    label: Git Deploy Key
+    description: |
+      Optional: If you specified a private repository, provide your private
+      deploy key here.
+    type: string
+    default: ''
+
+  destination:
+    label: Site Path
+    description: Path to setup your application on your servers.
+    default: /var/www/vhosts/application
+    type: string
+
+  stack_id:
+    type: string
+    default: node
+
+  db_server_ip:
+    type: string
+    default: ''
+
+  database_username:
+    type: string
+    default: ''
+
+  database_user_password:
+    type: string
+    default: ''
+
+
+resources:
+
+  nodejs_user_password:
+    type: "OS::Heat::RandomString"
+    properties:
+      length: 16
+      sequence: lettersdigits
+
+  nodestack_node:
+    type: 'OS::Nova::Server'
+    properties:
+      name: { get_param: hostname }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: ssh_key_name }
+      metadata:
+        rax-heat: { get_param: stack_id }
+
+  nodestack_chef_run:
+    type: 'OS::Heat::ChefSolo'
+    depends_on: nodestack_node
+    properties:
+      username: root
+      private_key: { get_param: ssh_private_key }
+      host: { get_attr: [nodestack_node, accessIPv4] }
+      kitchen: { get_param: kitchen }
+      chef_version: { get_param: chef_version }
+      node:
+        nodejs_app:
+          packages: { get_param: packages }
+          git_repo: { get_param: repo }
+          rev: { get_param: revision }
+          deploy_key: { get_param: deploy_key }
+          destination: { get_param: destination }
+        rax:
+          firewall:
+            tcp: [22, 80]
+        deployment:
+          id: { get_param: stack_id }
+          app_id: nodejs
+        run_list: ["recipe[apt]",
+                   "recipe[nodejs]",
+                   "recipe[ssh_known_hosts]",
+                   "recipe[nodejs_app]",
+                   "recipe[rax-firewall]"]
+      data_bags:
+        nodejs:
+          encrypted: true
+          id: { get_param: stack_id }
+          nodejs_app:
+            password: { get_attr: [nodejs_user_password, value] }
+            deploy_key: { get_param: deploy_key }
+            database_url:
+              str_replace:
+                template: 'mysql://%dbuser%:%dbpasswd%@%dbhostname%'
+                params:
+                  '%dbuser%': { get_param: database_username }
+                  '%dbpasswd%': { get_param: database_user_password }
+                  '%dbhostname%': { get_param: db_server_ip }
+
+outputs:
+  accessIPv4:
+    description: Node.js node public IP
+    value: { get_attr: [nodestack_node, accessIPv4] }
+
+  privateIPv4:
+    description: NodeJS node prive IP
+    value: { get_attr: [nodestack_node, networks, private, 0] }
