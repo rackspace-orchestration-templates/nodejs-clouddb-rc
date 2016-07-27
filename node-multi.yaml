@@ -279,7 +279,7 @@ resources:
     properties:
       signal_transport: TEMP_URL_SIGNAL
       input_values:
-        nginx_vhost_str: { get_param: joomla_url }
+        nginx_vhost_str: 'loadbalancer'
         nginx_vhost_template: "loadbalancer"
         nginx_upstream_server: '0.0.0.0 down'
         nginx_lb_nodes: { get_attr: [nodejs_app_servers, rc_network] }

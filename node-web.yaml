@@ -170,6 +170,9 @@ resources:
       flavor: { get_param: flavor }
       image: { get_param: image }
       key_name: { get_param: ssh_key_name }
+      networks:
+      - network: { get_param: rc_network_name }
+      - network: 11111111-1111-1111-1111-111111111111
       metadata:
         rax-heat: { get_param: stack_id }
 
